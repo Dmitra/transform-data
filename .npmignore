@@ -1,0 +1,6 @@
+.idea/
+.parcel-cache/
+test/
+babel.config.json
+yarn-error.log
+.yarn/
