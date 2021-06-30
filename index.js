@@ -1,11 +1,14 @@
 import {
   set, hasIn,
   isUndefined, isString, isFunction, isArray, isPlainObject,
-  each, castArray, flatten, slice,
+  each, castArray, flatten, slice, last,
 } from 'lodash-es'
 
 const SEPARATOR = '/'
 const SPECIAL_KEY = '.'
+const OBJ_SEPARATOR = '.'
+const LEVEL_UP = '..'
+const LEVEL_THIS = '.'
 
 export default function convert (source, map, dest, srcPath = [SEPARATOR], destPath = srcPath) {
   source = hasIn(source, SEPARATOR) ? source : { [SEPARATOR]: source }
@@ -29,7 +32,7 @@ export default function convert (source, map, dest, srcPath = [SEPARATOR], destP
   if (isString(curMap)) {
     const curMapPath = parsePath(curMap)
     const isAbsolute = curMapPath[0] === SEPARATOR
-    destPath = isAbsolute ? curMapPath : compactPath(destPath, '..', curMapPath)
+    destPath = isAbsolute ? curMapPath : compactPath(destPath, LEVEL_UP, curMapPath)
     destValue = curValue
   }
 
@@ -63,7 +66,7 @@ export default function convert (source, map, dest, srcPath = [SEPARATOR], destP
         if (transform === '') return
         const curMapPath = parsePath(transform)
         const isAbsolute = curMapPath[0] === SEPARATOR
-        destPaths.push(isAbsolute ? curMapPath : compactPath(destPath, '..', curMapPath))
+        destPaths.push(isAbsolute ? curMapPath : compactPath(destPath, LEVEL_UP, curMapPath))
       }
     })
   } else {
@@ -77,7 +80,7 @@ export default function convert (source, map, dest, srcPath = [SEPARATOR], destP
     if (isValueObject || isValueArray) {
       each(destPaths, destPath => {
         // init array
-        set(dest, stringifyPath(destPath), isValueObject ? {} : [])
+        set(dest, toObjectPath(destPath), isValueObject ? {} : [])
         each(curValue, (v, key) => {
           const newSrcPath = [...srcPath, key]
           const newDestPath = [...destPath, key]
@@ -87,7 +90,7 @@ export default function convert (source, map, dest, srcPath = [SEPARATOR], destP
     }
   } else {
     each(destPaths, destPath => {
-      set(dest, stringifyPath(destPath), destValue)
+      set(dest, toObjectPath(destPath), destValue)
     })
   }
 
@@ -102,13 +105,13 @@ function getByPath (obj, path) {
   })
   return result
 }
-
+// transform string path to array
 function parsePath (str) {
   const absolute = str && str.startsWith(SEPARATOR)
   if (absolute) str = str.slice(1)
   if (absolute && str.length === 0) return [SEPARATOR]
 
-  let path = str ? str.split(SEPARATOR) : '.'
+  let path = str ? str.split(SEPARATOR) : SPECIAL_KEY
   if (absolute) path.unshift(SEPARATOR)
   return compactPath(path)
 }
@@ -117,19 +120,24 @@ function compactPath (...parts) {
   parts = flatten(parts)
   let path = []
   each(parts, part => {
-    if (part === '..') {
-      if (path.length > 1 || path[0] !== SEPARATOR) {
-        path = [...slice(path, 0, path.length - 1)]
-      }
-    } else if (part === '.') return
-    else {
-      path.push(part)
+    switch (part) {
+      case LEVEL_THIS:
+        return
+      case LEVEL_UP:
+        const previousUp = last(path) === LEVEL_UP
+        const previousRoot = last(path) === SEPARATOR
+        if (path.length > 0 && !previousUp && !previousRoot) {
+          path = [...slice(path, 0, path.length - 1)]
+        }
+        if (previousUp || path.length === 0) path.push(part)
+        break
+      default:
+        path.push(part)
     }
   })
-
   return path
 }
 
-function stringifyPath (path) {
+function toObjectPath (path) {
   return path.join('.')
 }

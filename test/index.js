@@ -167,6 +167,14 @@ describe('object syntax', () => {
     expect(data).toStrictEqual({ _a: 1 })
   })
 
+  test('rename key by "go 2 levels up" path', () => {
+    const data = convert(
+      { a: { b: 1 } },
+      { a: { b: '../../_b' }},
+    )
+    expect(data).toStrictEqual({ a: {}, _b: 1 })
+  })
+
   test('move value to the root', () => {
     const data = convert(
       { a: 1 },
